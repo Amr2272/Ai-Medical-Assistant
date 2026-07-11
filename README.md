@@ -303,16 +303,4 @@ Contributions, issues, and feature requests are welcome!
 4. Push to the branch (`git push origin feature/your-feature`)
 5. Open a Pull Request
 
----
 
-## 📄 License
-
-This project is provided for educational and research purposes. Ensure you comply with all applicable regulations when handling medical data.
-
----
-
-## 🙏 Acknowledgements
-
-Built with RAG, LangChain & Groq.
-
-> **AI Medical Assistant v1.1** — *Not a substitute for professional medical advice.*
