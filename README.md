@@ -1,157 +1,318 @@
 # 🩺 AI Medical Assistant
 
-A Retrieval-Augmented Generation (RAG) chatbot for medical Q&A, combining:
-- **Document search** over medical PDFs/TXT files (COVID-19 info, CDC reports, etc.)
-- **Structured analytics** over a patient records CSV — statistical questions
-  (e.g. "how many patients have diabetes?") are answered by direct computation
-  on the data, not by semantic search, so the numbers are always exact.
+**A production-style Retrieval-Augmented Generation (RAG) system for medical question-answering**, built with LangChain, Groq LLMs, FAISS, and Streamlit — combining semantic document search with a safe text-to-pandas analytics layer for exact, grounded answers.
 
-> ⚠️ **This is not a substitute for professional medical advice.** See the
-> disclaimer shown in the app itself.
+<p align="left">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/LangChain-RAG-1C3C3C?logo=langchain&logoColor=white" alt="LangChain">
+  <img src="https://img.shields.io/badge/Groq-LLM%20Inference-F55036" alt="Groq">
+  <img src="https://img.shields.io/badge/FAISS-Vector%20Search-00A0D2" alt="FAISS">
+  <img src="https://img.shields.io/badge/Streamlit-UI-FF4B4B?logo=streamlit&logoColor=white" alt="Streamlit">
+  <img src="https://img.shields.io/badge/License-Educational-lightgrey" alt="License">
+</p>
 
 ---
 
-## 1. Requirements
+## 📌 Overview
+
+The assistant answers two distinct kinds of medical questions accurately:
+
+- **Open-ended / semantic questions** — *"What are the symptoms of COVID-19?"* — answered via retrieval-augmented generation grounded strictly in your source documents.
+- **Structured / statistical questions** — *"How many patients have diabetes?"* — routed to a sandboxed pandas-execution layer so numbers are always exact, never hallucinated.
+
+A query router automatically decides which path to take, so users can move fluidly between the two without changing how they ask questions.
+
+---
+
+## 📖 Table of Contents
+
+- [Features](#-features)
+- [Architecture](#️-architecture)
+- [Project Structure](#-project-structure)
+- [Quick Start](#-quick-start)
+- [Configuration](#️-configuration)
+- [How It Works](#-how-it-works)
+- [Safety & Limitations](#-safety--limitations)
+- [Example Questions](#-example-questions)
+- [Troubleshooting](#️-troubleshooting)
+- [Tech Stack](#-tech-stack)
+- [Roadmap](#-roadmap)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Acknowledgements](#-acknowledgements)
+
+---
+
+## ✨ Features
+
+| Capability | Description |
+|---|---|
+| 🔍 **Hybrid Retrieval** | Semantic search over PDFs/TXT/CSV using FAISS + HuggingFace embeddings |
+| 🧠 **History-Aware RAG** | Follow-up questions are automatically contextualized using chat history |
+| 📊 **Text-to-Pandas Analytics** | Statistical/structured questions are routed to a safe pandas-execution layer for exact answers |
+| 🛡️ **Safe Expression Sandbox** | Generated pandas code is validated via AST against an allow-list before execution |
+| 💾 **Persistent Chat History** | Conversations are saved to JSON and restored on restart |
+| 👥 **Multi-Session Support** | Switch between separate user contexts, each with its own chats |
+| 🎨 **Light & Dark Themes** | Seamless theme detection and styling for both modes |
+| ⚡ **FAISS Index Caching** | Embeddings are cached on disk — fast startup on subsequent runs |
+| 🌐 **Bilingual Keywords** | Statistical query detection supports both English and Arabic keywords |
+| ⚠️ **Medical Disclaimer** | Built-in disclaimer banner reminding users this is not professional medical advice |
+
+---
+
+## 🏗️ Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                     Streamlit UI (app.py)                 │
+│   Chat interface · Sidebar · Session management · Theme   │
+└────────────────────────────┬─────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────┐
+│                  RAGOrchestrator (rag.py)                 │
+│                                                             │
+│   ┌─────────────────┐     ┌──────────────────────────┐    │
+│   │  Query Router    │────▶│  PatientAnalytics        │    │
+│   │ (is_statistical) │     │  (text-to-pandas, safe)   │    │
+│   └────────┬─────────┘     └──────────────────────────┘    │
+│            │ no match / can't answer                       │
+│            ▼                                                │
+│   ┌─────────────────────────────────────────────────┐      │
+│   │  History-Aware Retriever  →  Stuff Documents QA  │      │
+│   │  (contextualize prompt)     (QA prompt + LLM)    │      │
+│   └─────────────────────────────────────────────────┘      │
+└────────────────────────────┬─────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+┌──────────────┐   ┌──────────────────┐   ┌──────────────────┐
+│  LLMManager   │   │ RetrieverManager │   │ DataPreprocessor │
+│  (Groq API)   │   │ (FAISS + HF Emb) │   │ (PDF/TXT/CSV)    │
+└──────────────┘   └──────────────────┘   └──────────────────┘
+```
+
+---
+
+## 📁 Project Structure
+
+```
+.
+├── app.py                  # Streamlit UI + persistent chat history
+├── run.py                  # Entry point — launches the Streamlit server
+├── data/                   # Place your PDF / TXT / CSV files here
+│   └── healthcare_dataset_cleaned.csv   # (optional) patient records for analytics
+├── faiss_index/            # Auto-generated FAISS cache (created on first run)
+├── src/
+│   ├── __init__.py         # Package exports
+│   ├── config.py           # All configuration constants
+│   ├── llm.py              # LLMManager — Groq ChatGroq singleton
+│   ├── retriever.py        # RetrieverManager — FAISS + embeddings (with caching)
+│   ├── preprocessing.py    # DataPreprocessor — loads & chunks PDFs/TXT/CSV
+│   ├── prompts.py          # Contextualization & QA prompt templates
+│   ├── analytics.py        # PatientAnalytics — text-to-pandas with safety checks
+│   └── rag.py              # RAGOrchestrator — ties everything together
+└── .env                     # API keys (GROQ_API_KEY, GROQ_MODEL)
+```
+
+---
+
+## 🚀 Quick Start
+
+### 1. Prerequisites
 
 - **Python 3.10+**
-- **A HuggingFace account** (the LLM,llama-3.3-70b-versatile, is a *gated* model)
-- **Hardware:**
-  - **GPU strongly recommended** — the app will run on CPU but will be **very
-    slow** (answers can take minutes).
-  - If you don't have a suitable GPU, consider
+- A free **Groq API key** → get one at [console.groq.com/keys](https://console.groq.com/keys)
 
----
-
-## 2. Setup
-
-### 2.1 Install dependencies
+### 2. Clone & Install
 
 ```bash
-python -m venv venv
-source venv/bin/activate        # on Windows: venv\Scripts\activate
+git clone <your-repo-url>
+cd ai-medical-assistant
 
 pip install -r requirements.txt
 ```
 
-If you have an NVIDIA GPU, make sure you have a CUDA-compatible build of
-PyTorch installed (the default `pip install torch` from requirements.txt
-usually picks the right one automatically, but if `torch.cuda.is_available()`
-returns `False` on a machine with a GPU, reinstall PyTorch following the
-instructions at https://pytorch.org/get-started/locally/).
+> If you don't have a `requirements.txt`, the main dependencies are:
+> ```text
+> streamlit
+> langchain
+> langchain-groq
+> langchain-huggingface
+> langchain-community
+> faiss-cpu
+> sentence-transformers
+> torch
+> pypdf
+> pandas
+> tabulate
+> python-dotenv
+> ```
 
-### 2.2 Authenticate with HuggingFace
+### 3. Configure Environment
 
-Mistral-7B-Instruct requires accepting its license and logging in:
+Create a `.env` file in the project root:
 
-1. Create a free account at https://huggingface.co
-2. Request access to the model: https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3
-3. Create an access token: https://huggingface.co/settings/tokens
-4. Log in from the terminal:
-
-```bash
-huggingface-cli login
-# paste your token when prompted
+```env
+GROQ_API_KEY=your_key_here
+GROQ_MODEL=openai/gpt-oss-120b
 ```
 
-### 2.3 Add your data (already included)
+### 4. Add Your Data
 
-The `data/` folder should contain:
-- `healthcare_dataset_cleaned.csv` — patient records (used by the analytics layer)
-- Any `.pdf` or `.txt` files you want the RAG system to search over
+Place your documents in the `data/` directory:
 
-This project ships with sample data already in place. To add more sources,
-just drop more `.pdf` or `.txt` files into `data/` and rebuild the index (see
-below).
+```
+data/
+├── medical_guide.pdf
+├── covid_notes.txt
+└── healthcare_dataset_cleaned.csv   # optional — enables analytics layer
+```
 
----
+Supported formats:
+- **PDF** — loaded via `PyPDFLoader`
+- **TXT** — loaded via `TextLoader`
+- **CSV** — patient records (only ingested into RAG if `INCLUDE_CSV_IN_RAG=True` in `config.py`; otherwise handled exclusively by the analytics layer)
 
-## 3. Running the app
+### 5. Run
 
 ```bash
 python run.py
 ```
 
-This starts a Streamlit server and opens the app at `http://localhost:8501`.
+Or directly with Streamlit:
 
-**First run:** the app will download the embedding model and the LLM
-(several GB), then build a FAISS search index from the documents in `data/`.
-This can take a while, especially on CPU.
-
-**Subsequent runs** are much faster — the FAISS index is cached to disk
-(`faiss_index/`) and loaded directly instead of being rebuilt.
-
-If you add/change files in `data/`, click **"♻️ Rebuild Knowledge Base"** in
-the app sidebar to refresh the index.
-
----
-
-## 4. Project structure
-
-```
-.
-├── app.py                  # Streamlit UI
-├── run.py                  # Entry point (checks data/, launches Streamlit)
-├── requirements.txt
-├── data/                   # Your source documents + patient CSV
-├── faiss_index/            # Auto-generated vector index cache (after first run)
-└── src/
-    ├── config.py           # Paths, model names, chunking/retrieval settings
-    ├── llm.py               # Loads & quantizes the local LLM
-    ├── retriever.py         # Embeddings + FAISS index (build/save/load)
-    ├── preprocessing.py     # Loads & splits PDF/TXT documents
-    ├── prompts.py            # System prompts for the RAG chain
-    ├── analytics.py          # Text-to-pandas layer for statistical questions
-    └── rag.py                 # Orchestrator: routes questions, runs the chains
+```bash
+streamlit run app.py --server.port 8501
 ```
 
----
-
-## 5. How questions are answered
-
-1. **Statistical questions** about the patient dataset ("كام مريض عنده سكر؟",
-   "average age of cancer patients") → routed to `src/analytics.py`, which
-   asks the LLM to generate a single pandas expression, validates it is safe,
-   and executes it directly against the CSV. The number in the answer is
-   always the real computed value, never guessed by the model.
-2. **Everything else** (symptoms, definitions, document content) → goes
-   through the standard RAG pipeline: retrieve relevant chunks from the
-   FAISS index, then generate an answer grounded in that context.
-3. If the analytics layer can't confidently answer, it automatically falls
-   back to the RAG pipeline.
+The app will open at [http://localhost:8501](http://localhost:8501).
 
 ---
 
-## 6. Known limitations
+## ⚙️ Configuration
 
-- **Chat history is in-memory only** — it's lost if the app restarts. For
-  persistent history, swap `InMemoryChatMessageHistory` in `src/rag.py` for
-  a database-backed store (e.g. SQLite).
-- **The statistical-question router is keyword-based** — it may occasionally
-  miss an unusual phrasing and send a statistical question through the RAG
-  path instead. If you notice this happening, the keyword list is in
-  `src/analytics.py` (`_STAT_KEYWORDS`).
-- **Not yet containerized** — see the project owner if you need a Dockerfile
-  for deployment.
-- **Not a medical device** — outputs are for informational purposes only.
+All settings live in [`src/config.py`](src/config.py):
+
+| Setting | Default | Description |
+|---|---|---|
+| `DATA_DIR` | `./data` | Directory containing source documents |
+| `FAISS_INDEX_DIR` | `./faiss_index` | Where the cached FAISS index is stored |
+| `PATIENT_CSV_PATH` | `./data/healthcare_dataset_cleaned.csv` | CSV used by the analytics layer |
+| `INCLUDE_CSV_IN_RAG` | `False` | If `True`, patient records are also ingested into the vector store |
+| `DEVICE` | auto (`cuda` if available, else `cpu`) | Compute device for embeddings |
+| `LLM_MODEL` | `openai/gpt-oss-120b` | Groq model name (override via `GROQ_MODEL` env var) |
+| `LLM_MAX_TOKENS` | `512` | Max generation tokens |
+| `LLM_TEMPERATURE` | `0.5` | Sampling temperature |
+| `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | HuggingFace embedding model |
+| `CHUNK_SIZE` | `1000` | Document chunk size (characters) |
+| `CHUNK_OVERLAP` | `200` | Overlap between chunks |
+| `TOP_K_RESULTS` | `5` | Number of chunks retrieved per query |
+| `SEARCH_TYPE` | `mmr` | FAISS search type (`similarity`, `mmr`, etc.) |
 
 ---
 
-## 7. Troubleshooting
+## 💬 How It Works
 
-| Problem | Likely cause / fix |
+### 1. Document Ingestion
+On first launch, `DataPreprocessor` loads all PDFs and TXT files from `data/`, splits them into chunks using `RecursiveCharacterTextSplitter`, and embeds them into a FAISS index. The index is cached to `faiss_index/` so subsequent startups skip re-embedding.
+
+### 2. Query Routing
+When you ask a question, `RAGOrchestrator.run()` first checks `PatientAnalytics.is_statistical_query()` — a heuristic that looks for keywords like *"how many"*, *"average"*, *"percentage"*, *"كام"*, *"عدد"*, etc.
+
+- **Statistical query** → The LLM generates a single pandas expression, which is validated by an AST-based allow-list (no imports, no file I/O, no method calls on a blocklist like `to_csv`, `eval`, `query`). If safe, it's executed against the CSV and the result is formatted directly — keeping numbers exact.
+- **Semantic query** → Falls through to the standard RAG chain: the question is contextualized using chat history, relevant chunks are retrieved from FAISS, and the LLM generates an answer grounded **only** in the retrieved context.
+
+### 3. Conversation Memory
+Each session maintains an `InMemoryChatMessageHistory`. When you reload a saved chat, `restore_rag_memory()` replays the message pairs into the LLM's memory so follow-up questions work correctly.
+
+### 4. Persistent Chat History
+All chats are serialized to `data/chat_history.json` (with `datetime` ISO encoding). The sidebar lets you:
+- ➕ Start a new chat
+- 🗑️ Delete a chat
+- 🔑 Switch user sessions
+- ♻️ Rebuild the knowledge base (clears FAISS cache)
+
+---
+
+## 🔒 Safety & Limitations
+
+- **Medical Disclaimer**: This assistant is **not a substitute for professional medical advice**. Always consult a licensed physician.
+- **Grounded Answers**: The QA prompt explicitly forbids the LLM from using external knowledge or hallucinating. If the answer isn't in the retrieved context, the assistant says so.
+- **Sandboxed Analytics**: Generated pandas expressions are parsed with `ast` and rejected if they contain imports, assignments, function definitions, file/network operations, or calls to dangerous methods.
+- **No External Data**: The system only answers based on documents you place in `data/`.
+
+---
+
+## 🧪 Example Questions
+
+**Semantic (RAG):**
+- *"What are the symptoms of COVID-19?"*
+- *"What medications are used for hypertension?"*
+- *"What is the treatment for severe COVID-19?"*
+- *"What are the risk factors for heart disease?"*
+
+**Structured (Analytics):**
+- *"How many patients have diabetes?"*
+- *"What is the average age of patients with cancer?"*
+- *"Which doctor treats the most patients?"*
+- *"Show me patients with cancer admitted urgently"*
+
+---
+
+## 🛠️ Troubleshooting
+
+| Issue | Fix |
 |---|---|
-| `401 Unauthorized` downloading the model | You haven't run `huggingface-cli login`, or haven't been granted access to the gated Mistral model yet. |
-| App is extremely slow to answer | You're running on CPU. Either use a GPU machine or switch to an API-based LLM. |
-| `CUDA out of memory` | Lower `LLM_MAX_NEW_TOKENS` in `src/config.py`, or make sure 4-bit quantization (`USE_4BIT_QUANTIZATION = True`) is enabled. |
-| Answers don't reflect new files added to `data/` | Click "♻️ Rebuild Knowledge Base" in the sidebar, or delete the `faiss_index/` folder and restart. |
-| CSV-related questions go to the wrong pipeline | Add the phrasing you used to `_STAT_KEYWORDS` in `src/analytics.py`. |
+| `GROQ_API_KEY is not set` | Create a `.env` file with your key (see [Configure Environment](#3-configure-environment)) |
+| Slow first startup | Expected — embeddings are being computed. Subsequent runs use the FAISS cache. |
+| `No cached FAISS index found and no documents were provided` | Add at least one PDF or TXT file to `data/` |
+| Analytics layer disabled | Ensure `data/healthcare_dataset_cleaned.csv` exists with the expected columns |
+| Want to rebuild the index | Click **♻️ Rebuild Knowledge Base** in the sidebar, or delete the `faiss_index/` folder |
 
 ---
 
-## Notes
+## 📦 Tech Stack
 
-This project currently runs Mistral-7B **locally**, which requires a capable
-GPU. If most users running this app won't have one, an easy upgrade is to
-swap `src/llm.py` for a call to a hosted LLM API instead — this removes the
-GPU requirement entirely and runs identically on any machine. Ask if you'd
-like this change made.
+- **[Streamlit](https://streamlit.io/)** — Web UI
+- **[LangChain](https://www.langchain.com/)** — RAG orchestration
+- **[Groq](https://groq.com/)** — Fast LLM inference
+- **[FAISS](https://github.com/facebookresearch/faiss)** — Vector search
+- **[HuggingFace Transformers](https://huggingface.co/)** — Embeddings
+- **[PyTorch](https://pytorch.org/)** — Backend for embeddings
+- **[Pandas](https://pandas.pydata.org/)** — Structured data analytics
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Add automated evaluation suite for retrieval quality
+- [ ] Support additional document formats (DOCX, HTML)
+- [ ] Add citation highlighting in the UI for retrieved sources
+- [ ] Dockerize the app for one-command deployment
+
+---
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome!
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes (`git commit -m 'Add some feature'`)
+4. Push to the branch (`git push origin feature/your-feature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is provided for educational and research purposes. Ensure you comply with all applicable regulations when handling medical data.
+
+---
+
+## 🙏 Acknowledgements
+
+Built with RAG, LangChain & Groq.
+
+> **AI Medical Assistant v1.1** — *Not a substitute for professional medical advice.*
