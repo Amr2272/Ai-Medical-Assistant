@@ -17,7 +17,7 @@ class DataPreprocessor:
     """
     Handles all data preprocessing operations
     """
-    
+
     def __init__(self, data_dir: str = None):
         self.data_dir = data_dir or DATA_DIR
         self.splitter = RecursiveCharacterTextSplitter(
@@ -25,61 +25,50 @@ class DataPreprocessor:
             chunk_overlap=CHUNK_OVERLAP,
             separators=["\n\n", "\n", ". ", " ", ""],
         )
-    
+
     def load_documents(self) -> list[Document]:
         """
         Load documents from all sources (PDF, TXT, CSV)
-        
+
         Returns:
             list[Document]: List of loaded documents
         """
         docs = []
-        
-        # Load PDF files
-        pdf_count = self._load_pdfs(docs)
-        print(f"📄 Loaded {pdf_count} PDF document(s)")
-        
-        # Load text files
-        txt_count = self._load_text_files(docs)
-        print(f"📄 Loaded {txt_count} text document(s)")
-        
-        # Load CSV patient records (only if explicitly enabled — see config.py)
+
+        self._load_pdfs(docs)
+        self._load_text_files(docs)
+
         if INCLUDE_CSV_IN_RAG:
-            csv_count = self._load_csv_data(docs)
-            print(f"📊 Loaded {csv_count} patient record(s)")
-        else:
-            print("📊 Skipping CSV → RAG ingestion (handled by the analytics layer instead)")
-        
-        print(f"✅ Total documents loaded: {len(docs)}")
+            self._load_csv_data(docs)
+
         return docs
-    
+
     def _load_pdfs(self, docs: list) -> int:
         """Load all PDF files from data directory"""
         count = 0
         if not os.path.exists(self.data_dir):
             return count
-            
+
         for file in os.listdir(self.data_dir):
             if file.endswith(".pdf"):
                 try:
                     loader = PyPDFLoader(os.path.join(self.data_dir, file))
                     pdf_docs = loader.load()
-                    # Add source metadata
                     for doc in pdf_docs:
                         doc.metadata["source_type"] = "PDF"
                         doc.metadata["file_name"] = file
                     docs.extend(pdf_docs)
                     count += 1
-                except Exception as e:
-                    print(f"⚠️ Error loading {file}: {e}")
+                except Exception:
+                    pass
         return count
-    
+
     def _load_text_files(self, docs: list) -> int:
         """Load all TXT files from data directory"""
         count = 0
         if not os.path.exists(self.data_dir):
             return count
-            
+
         for file in os.listdir(self.data_dir):
             if file.endswith(".txt"):
                 try:
@@ -90,24 +79,23 @@ class DataPreprocessor:
                         doc.metadata["file_name"] = file
                     docs.extend(txt_docs)
                     count += 1
-                except Exception as e:
-                    print(f"⚠️ Error loading {file}: {e}")
+                except Exception:
+                    pass
         return count
-    
+
     def _load_csv_data(self, docs: list) -> int:
         """Load patient records from CSV and convert to documents"""
         csv_path = os.path.join(self.data_dir, "healthcare_dataset_cleaned.csv")
-        
+
         if not os.path.exists(csv_path):
-            print(f"⚠️ CSV file not found: {csv_path}")
             return 0
-        
+
         try:
             df = pd.read_csv(csv_path)
-            
+
             for index, row in df.iterrows():
                 patient_text = self._format_patient_record(row)
-                
+
                 doc = Document(
                     page_content=patient_text,
                     metadata={
@@ -119,12 +107,11 @@ class DataPreprocessor:
                     },
                 )
                 docs.append(doc)
-            
+
             return len(df)
-        except Exception as e:
-            print(f"⚠️ Error loading CSV: {e}")
+        except Exception:
             return 0
-    
+
     def _format_patient_record(self, row) -> str:
         """Format a patient record row into readable text"""
         return (
@@ -143,40 +130,30 @@ class DataPreprocessor:
             f"- Medication: {row.get('Medication', 'N/A')}\n"
             f"- Test Results: {row.get('Test Results', 'N/A')}\n"
         )
-    
+
     def split_documents(self, documents: list[Document]) -> list[Document]:
         """
         Split documents into chunks
-        
+
         Args:
             documents: List of documents to split
-            
+
         Returns:
             list[Document]: List of document chunks
         """
-        splits = self.splitter.split_documents(documents)
-        print(f"✂️ Split {len(documents)} documents into {len(splits)} chunks")
-        return splits
-    
+        return self.splitter.split_documents(documents)
+
     def process(self) -> list[Document]:
         """
         Full preprocessing pipeline: load and split
-        
+
         Returns:
             list[Document]: Processed document chunks
         """
-        print("\n" + "="*50)
-        print("🔄 Starting Data Preprocessing")
-        print("="*50)
-        
         docs = self.load_documents()
-        splits = self.split_documents(docs)
-        
-        print("="*50 + "\n")
-        return splits
+        return self.split_documents(docs)
 
 
-# Convenience function
 def preprocess_data() -> list[Document]:
     """Run the full preprocessing pipeline"""
     preprocessor = DataPreprocessor()

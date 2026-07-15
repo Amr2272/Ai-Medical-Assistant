@@ -1,0 +1,18 @@
+# Secrets — never commit
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# App-generated data
+faiss_index/
+data/chat_history.json
+
+# OS/IDE
+.DS_Store
+.vscode/
+.idea/

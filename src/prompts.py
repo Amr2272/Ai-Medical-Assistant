@@ -7,6 +7,11 @@ Contains all prompt templates used in the RAG system
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 
+# Fallback string the model uses when the answer isn't in the retrieved
+# context; shared so other modules can detect this exact response.
+NOT_FOUND_MESSAGE = "I couldn't find this information in the available documents."
+
+
 # =========================
 # System Prompts
 # =========================
@@ -39,7 +44,7 @@ STRICT RULES - YOU MUST FOLLOW THESE:
 2. ❌ Do NOT use any external knowledge
 3. ❌ Do NOT make up or hallucinate information
 4. ❌ If the answer is NOT in the context, reply EXACTLY:
-   "I couldn't find this information in the available documents."
+   "%s"
 5. ✅ Keep answers clear, concise, and professional
 6. ✅ Use bullet points when listing multiple items
 7. ❌ Do NOT mention "the context" or "retrieval process" in your answer
@@ -50,7 +55,7 @@ CONTEXT:
 {context}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"""
+""" % NOT_FOUND_MESSAGE
 
 
 # =========================

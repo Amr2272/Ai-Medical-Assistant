@@ -25,16 +25,55 @@ _STAT_KEYWORDS = [
     "كام", "عدد", "متوسط", "معدل", "نسبة", "أكتر", "اكتر", "الأكثر",
     "أكثر", "إجمالي", "اجمالي", "أعلى", "اعلى", "أقل", "اقل",
     "قايمة المرضى", "لستة المرضى", "توزيع", "احصائ", "إحصائ",
+    "مجموع", "اكبر", "أكبر", "اصغر", "أصغر", "كام واحد", "كام مريض",
+    "اكتر دكتور", "اكتر مستشفى", "اكتر مرض", "اكتر حالة",
     # Arabic — specific patient record lookup
     "بيانات المريض", "معلومات عن المريض", "معلومات المريض", "سجل المريض",
 ]
 
 
-def is_statistical_query(question: str) -> bool:
-    """Heuristic router: True if the question looks like it needs exact
-    computation over the patient dataset rather than semantic document search."""
+_INTENT_DETECTION_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", """You are a query router. Determine if the user's question requires calculating exact statistics, counting records, or listing specific entries from a structured patient database (CSV).
+
+Database contains: Patient Name, Age, Gender, Blood Type, Medical Condition, Billing Amount, Doctor, Hospital, etc.
+
+Return 'STAT' if the question needs:
+- Counting (e.g., "How many...", "How many patients have...")
+- Averaging/Sums (e.g., "Average age", "Total billing")
+- Max/Min (e.g., "Oldest patient", "Highest amount")
+- Listing specific records (e.g., "List all patients with cancer", "Show me records for ahmed")
+- Comparisons (e.g., "Which doctor has more patients")
+
+Return 'RAG' if the question is:
+- General medical advice
+- Information about a disease (e.g., "What is diabetes?")
+- General health questions
+- Anything not requiring exact database lookups
+
+Respond with ONLY 'STAT' or 'RAG'."""),
+    ("human", "{question}")
+])
+
+
+def is_statistical_query(question: str, llm=None) -> bool:
+    """
+    Hybrid router:
+    1. Check keywords (Fast heuristic)
+    2. If keywords fail, use LLM for intent detection (Smart fallback)
+    """
     q = question.lower()
-    return any(keyword in q for keyword in _STAT_KEYWORDS)
+    if any(keyword in q for keyword in _STAT_KEYWORDS):
+        return True
+    
+    if llm is not None:
+        try:
+            response = llm.invoke(_INTENT_DETECTION_PROMPT.format_messages(question=question))
+            intent = getattr(response, "content", str(response)).strip().upper()
+            return "STAT" in intent
+        except Exception:
+            return False
+            
+    return False
 
 
 # =========================
@@ -179,19 +218,13 @@ Expression:""")
 
 
 class PatientAnalytics:
-    """
-    Answers statistical / structured-data questions about the patient dataset
-    by translating them into a validated pandas expression and executing it
-    directly, instead of going through semantic (RAG) retrieval.
-    """
-
     def __init__(self, csv_path: str):
         self.csv_path = csv_path
         self.df = pd.read_csv(csv_path)
         self._chain = _QUERY_GEN_PROMPT
 
-    def is_statistical_query(self, question: str) -> bool:
-        return is_statistical_query(question)
+    def is_statistical_query(self, question: str, llm=None) -> bool:
+        return is_statistical_query(question, llm)
 
     def _generate_expression(self, question: str, llm) -> str:
         messages = self._chain.format_messages(schema=_SCHEMA_DESCRIPTION, question=question)
@@ -207,12 +240,10 @@ class PatientAnalytics:
         """
         try:
             expression = self._generate_expression(question, llm)
-        except Exception as e:
-            print(f"⚠️ Analytics: failed to generate expression: {e}")
+        except Exception:
             return None
 
         if not _is_safe_expression(expression):
-            print(f"⚠️ Analytics: rejected unsafe/invalid expression: {expression!r}")
             return None
 
         try:
@@ -232,8 +263,7 @@ class PatientAnalytics:
                     "abs": abs,
                 },
             )
-        except Exception as e:
-            print(f"⚠️ Analytics: execution failed for {expression!r}: {e}")
+        except Exception:
             return None
 
         formatted = _format_result(result)

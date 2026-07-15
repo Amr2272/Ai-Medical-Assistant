@@ -15,31 +15,30 @@ def main():
     """Main entry point"""
     
     print("\n" + "="*60)
-    print("🩺 AI Medical Assistant - Starting...")
+    print("[AI Medical Assistant] Starting...")
     print("="*60 + "\n")
     
     # Check data directory
     from src.config import DATA_DIR
     if not os.path.exists(DATA_DIR):
-        print(f"❌ Data directory not found: {DATA_DIR}")
+        print(f"[Error] Data directory not found: {DATA_DIR}")
         print("   Please create it and add your data files.")
         return
     
     data_files = os.listdir(DATA_DIR)
     if not data_files:
-        print(f"⚠️  Data directory is empty: {DATA_DIR}")
+        print(f"[Warning] Data directory is empty: {DATA_DIR}")
         print("   Please add PDF, TXT, or CSV files.")
         return
     
-    print(f"📁 Found {len(data_files)} file(s) in data directory:")
+    print(f"[Info] Found {len(data_files)} file(s) in data directory:")
     for f in data_files:
         print(f"   - {f}")
     print()
     
-    # Launch Streamlit
-    import streamlit.web.cli as stcli
-    sys.argv = ["streamlit", "run", "app.py", "--server.port", "8501"]
-    stcli.main()
+    # Launch FastAPI
+    import uvicorn
+    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
 
 
 if __name__ == "__main__":

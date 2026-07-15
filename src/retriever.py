@@ -32,7 +32,6 @@ class RetrieverManager:
     def _get_embeddings(self) -> HuggingFaceEmbeddings:
         """Get or create the embeddings model (loaded once)"""
         if self._embeddings is None:
-            print(f"🔮 Loading embedding model: {EMBEDDING_MODEL}")
             self._embeddings = HuggingFaceEmbeddings(
                 model_name=EMBEDDING_MODEL,
                 model_kwargs={"device": DEVICE},
@@ -71,32 +70,26 @@ class RetrieverManager:
         embeddings = self._get_embeddings()
         
         if not force_rebuild and self._index_exists(index_dir):
-            print(f"📂 Found cached FAISS index at '{index_dir}' — loading from disk...")
             self._vectorstore = FAISS.load_local(
                 index_dir,
                 embeddings,
                 allow_dangerous_deserialization=True,
             )
-            print("✅ FAISS index loaded from cache (no re-embedding needed)")
         else:
             if not documents:
                 raise ValueError(
                     "No cached FAISS index found and no documents were provided to build one."
                 )
-            print(f"📁 Creating FAISS index with {len(documents)} chunks...")
             self._vectorstore = FAISS.from_documents(documents, embeddings)
             
             os.makedirs(index_dir, exist_ok=True)
             self._vectorstore.save_local(index_dir)
-            print(f"💾 FAISS index saved to '{index_dir}' for future runs")
         
         self._retriever = self._vectorstore.as_retriever(
             search_type=SEARCH_TYPE,
             search_kwargs={"k": TOP_K_RESULTS},
         )
-        
-        print(f"✅ Retriever ready! (search_type={SEARCH_TYPE}, k={TOP_K_RESULTS})")
-        
+
         return self._retriever
     
     def get_vectorstore(self):
@@ -113,14 +106,12 @@ class RetrieverManager:
         """
         self._retriever = None
         self._vectorstore = None
-        print("🧹 Retriever cleared from memory")
         
         if delete_cache:
             import shutil
             index_dir = index_dir or FAISS_INDEX_DIR
             if os.path.exists(index_dir):
                 shutil.rmtree(index_dir)
-                print(f"🗑️ Deleted cached FAISS index at '{index_dir}'")
 
 
 # Convenience function

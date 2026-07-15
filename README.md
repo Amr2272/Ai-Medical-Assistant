@@ -1,157 +1,168 @@
-# 🩺 AI Medical Assistant
+# AI Medical Assistant
 
-A Retrieval-Augmented Generation (RAG) chatbot for medical Q&A, combining:
-- **Document search** over medical PDFs/TXT files (COVID-19 info, CDC reports, etc.)
-- **Structured analytics** over a patient records CSV — statistical questions
-  (e.g. "how many patients have diabetes?") are answered by direct computation
-  on the data, not by semantic search, so the numbers are always exact.
+## Overview
 
-> ⚠️ **This is not a substitute for professional medical advice.** See the
-> disclaimer shown in the app itself.
+This project is an AI-powered Medical Assistant designed to provide information based on a knowledge base of medical documents. It leverages Retrieval-Augmented Generation (RAG) to answer user queries and includes robust session management with user-specific chat histories. The system is built using FastAPI for the backend and a simple HTML/JavaScript frontend.
 
----
+## Features
 
-## 1. Requirements
+### Core AI Functionality
 
-- **Python 3.10+**
-- **A HuggingFace account** (the LLM,llama-3.3-70b-versatile, is a *gated* model)
-- **Hardware:**
-  - **GPU strongly recommended** — the app will run on CPU but will be **very
-    slow** (answers can take minutes).
-  - If you don't have a suitable GPU, consider
+*   **Retrieval-Augmented Generation (RAG)**: Answers medical questions by searching and synthesizing information from a provided knowledge base (PDF, TXT, CSV files).
+*   **Conversational History**: Maintains chat history for each session, allowing for follow-up questions and context-aware responses.
+*   **Statistical Analysis**: Can answer structured-data questions (e.g., "how many patients have diabetes?") by routing them to an analytics layer.
 
----
+### User and Session Management
 
-## 2. Setup
+*   **User ID Privacy**: Each user has a unique ID, ensuring that conversations and sessions are isolated and private. Users can only access their own chat histories.
+*   **Login/Logout System**: A simple login screen allows users to enter their User ID. This ID is stored locally in the browser's `localStorage`.
+*   **Session Creation**: Users can create new chat sessions.
+*   **Session Switching**: Users can switch between existing chat sessions, loading previous conversations.
+*   **Session Deletion**: Individual chat sessions can be deleted, and the system also supports clearing all sessions.
+*   **Persistent History**: Chat histories are stored in `data/chat_history.json` and loaded on application startup.
 
-### 2.1 Install dependencies
+### Technical Stack
+
+*   **Backend**: FastAPI (Python)
+*   **Frontend**: HTML, CSS, JavaScript
+*   **RAG Framework**: LangChain Ecosystem (langchain, langchain-core, langchain-community, langchain-classic)
+*   **LLM Integration**: Groq API (via `langchain-groq`)
+*   **Embeddings & Vector Store**: Sentence Transformers, FAISS
+*   **Document Processing**: PyPDF, Pandas
+
+## Project Structure
+
+```
+AI-Medical-Assistant-Enhanced-Analytics-Improved/
+├── .env.example
+├── app.py                      # Main FastAPI application
+├── data/                       # Medical documents (PDF, TXT, CSV) and chat_history.json
+│   ├── chat_history.json       # Persistent chat history storage
+│   └── ... (other data files)
+├── faiss_index/                # FAISS vector store index files
+│   ├── index.faiss
+│   └── index.pkl
+├── README.md                   # Project README (this file)
+├── requirements.txt            # Python dependencies
+├── run.py                      # Script to run the FastAPI application
+├── SESSION_MANAGEMENT.md       # Documentation for session management features
+├── src/                        # Source code for RAG components
+│   ├── analytics.py            # Patient analytics for structured queries
+│   ├── config.py               # Configuration settings
+│   ├── llm.py                  # LLM manager
+│   ├── preprocessing.py        # Data preprocessing for RAG
+│   ├── prompts.py              # LLM prompts
+│   ├── rag.py                  # RAG orchestrator
+│   └── retriever.py            # Document retriever
+├── static/                     # Main CSS file (should be moved to static/)                     
+│   └── style.css               # (CSS, JS, images) - currently contains style.css
+├── templates/                  # HTML templates
+│   ├── index.html              # Main UI template
+│   └── index_old.html          # Old UI template (pre-user ID feature)
+└── USER_ID_FEATURE.md          # Documentation for User ID privacy feature
+```
+
+## Setup and Installation
+
+### 1. Clone the Repository
 
 ```bash
-python -m venv venv
-source venv/bin/activate        # on Windows: venv\Scripts\activate
+git clone <repository_url>
+cd AI-Medical-Assistant-Enhanced-Analytics-Improved
+```
 
+### 2. Create a Virtual Environment (Recommended)
+
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+```
+
+### 3. Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-If you have an NVIDIA GPU, make sure you have a CUDA-compatible build of
-PyTorch installed (the default `pip install torch` from requirements.txt
-usually picks the right one automatically, but if `torch.cuda.is_available()`
-returns `False` on a machine with a GPU, reinstall PyTorch following the
-instructions at https://pytorch.org/get-started/locally/).
+### 4. Configure API Key
 
-### 2.2 Authenticate with HuggingFace
+Create a `.env` file in the project root based on `.env.example` and add your Groq API key:
 
-Mistral-7B-Instruct requires accepting its license and logging in:
-
-1. Create a free account at https://huggingface.co
-2. Request access to the model: https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3
-3. Create an access token: https://huggingface.co/settings/tokens
-4. Log in from the terminal:
-
-```bash
-huggingface-cli login
-# paste your token when prompted
+```
+GROQ_API_KEY="your_groq_api_key_here"
+GROQ_MODEL="openai/gpt-oss-120b" # Or your preferred Groq model
 ```
 
-### 2.3 Add your data (already included)
+### 5. Prepare Data
 
-The `data/` folder should contain:
-- `healthcare_dataset_cleaned.csv` — patient records (used by the analytics layer)
-- Any `.pdf` or `.txt` files you want the RAG system to search over
+Place your medical documents (PDF, TXT, CSV) in the `data/` directory. The RAG system will process these files to build its knowledge base.
 
-This project ships with sample data already in place. To add more sources,
-just drop more `.pdf` or `.txt` files into `data/` and rebuild the index (see
-below).
+## Usage
 
----
-
-## 3. Running the app
+### 1. Run the Application
 
 ```bash
 python run.py
 ```
 
-This starts a Streamlit server and opens the app at `http://localhost:8501`.
+The application will start, typically accessible at `http://127.0.0.1:8000`.
 
-**First run:** the app will download the embedding model and the LLM
-(several GB), then build a FAISS search index from the documents in `data/`.
-This can take a while, especially on CPU.
+### 2. Login
 
-**Subsequent runs** are much faster — the FAISS index is cached to disk
-(`faiss_index/`) and loaded directly instead of being rebuilt.
+Upon first access, you will be prompted to enter a User ID. This ID will be stored in your browser's `localStorage`.
 
-If you add/change files in `data/`, click **"♻️ Rebuild Knowledge Base"** in
-the app sidebar to refresh the index.
+### 3. Interact with the Assistant
 
----
+*   Type your medical questions into the chat input.
+*   Create new sessions, switch between them, or delete them using the sidebar controls.
 
-## 4. Project structure
+## API Endpoints
 
-```
-.
-├── app.py                  # Streamlit UI
-├── run.py                  # Entry point (checks data/, launches Streamlit)
-├── requirements.txt
-├── data/                   # Your source documents + patient CSV
-├── faiss_index/            # Auto-generated vector index cache (after first run)
-└── src/
-    ├── config.py           # Paths, model names, chunking/retrieval settings
-    ├── llm.py               # Loads & quantizes the local LLM
-    ├── retriever.py         # Embeddings + FAISS index (build/save/load)
-    ├── preprocessing.py     # Loads & splits PDF/TXT documents
-    ├── prompts.py            # System prompts for the RAG chain
-    ├── analytics.py          # Text-to-pandas layer for statistical questions
-    └── rag.py                 # Orchestrator: routes questions, runs the chains
-```
+The backend exposes the following API endpoints:
 
----
+| Endpoint                       | Method | Description                                     | Authentication (User ID) |
+| :----------------------------- | :----- | :---------------------------------------------- | :----------------------- |
+| `/`                            | GET    | Serves the main HTML application                | Optional                 |
+| `/api/session`                 | POST   | Creates a new chat session                      | Required                 |
+| `/api/session/{session_id}/switch` | POST   | Switches to an existing session                 | Required                 |
+| `/api/session/{session_id}`    | GET    | Retrieves information about a specific session  | Required                 |
+| `/api/sessions`                | GET    | Lists all sessions for the current user         | Required                 |
+| `/api/history`                 | GET    | Retrieves chat history for the current user     | Required                 |
+| `/api/history/{session_id}`    | GET    | Retrieves a specific chat session's messages    | Required                 |
+| `/api/history`                 | PUT    | Renames a chat session                          | Required                 |
+| `/api/history/{session_id}`    | DELETE | Deletes a specific chat session                 | Required                 |
+| `/api/history`                 | DELETE | Clears all chat sessions for the current user   | Required                 |
+| `/api/chat`                    | POST   | Sends a message to the AI assistant             | Required                 |
+| `/api/upload`                  | POST   | Uploads new medical documents                   | N/A                      |
+| `/api/rebuild`                 | POST   | Rebuilds the RAG knowledge base                 | N/A                      |
+| `/api/export`                  | GET    | Exports the entire chat history                 | N/A                      |
+| `/api/status`                  | GET    | Provides application status and metrics         | N/A                      |
+| `/health`                      | GET    | Health check endpoint                           | N/A                      |
 
-## 5. How questions are answered
+## Security Considerations
 
-1. **Statistical questions** about the patient dataset ("كام مريض عنده سكر؟",
-   "average age of cancer patients") → routed to `src/analytics.py`, which
-   asks the LLM to generate a single pandas expression, validates it is safe,
-   and executes it directly against the CSV. The number in the answer is
-   always the real computed value, never guessed by the model.
-2. **Everything else** (symptoms, definitions, document content) → goes
-   through the standard RAG pipeline: retrieve relevant chunks from the
-   FAISS index, then generate an answer grounded in that context.
-3. If the analytics layer can't confidently answer, it automatically falls
-   back to the RAG pipeline.
+*   **User ID System**: Provides data isolation for chat histories per user. However, it is a simple ID-based system without strong authentication (e.g., passwords).
+*   **Production Use**: For production environments, it is highly recommended to implement a robust authentication system (e.g., OAuth, JWT) and ensure HTTPS is used for all communications.
 
----
+## Future Enhancements
 
-## 6. Known limitations
+*   Implement a more robust authentication system (e.g., JWT).
+*   Migrate session storage from JSON files to a proper database.
+*   Add an admin panel for user and session management.
+*   Encrypt stored chat data.
+*   Implement automatic backups for chat history.
+*   Add features for session renaming, export/import, sharing, and archiving.
 
-- **Chat history is in-memory only** — it's lost if the app restarts. For
-  persistent history, swap `InMemoryChatMessageHistory` in `src/rag.py` for
-  a database-backed store (e.g. SQLite).
-- **The statistical-question router is keyword-based** — it may occasionally
-  miss an unusual phrasing and send a statistical question through the RAG
-  path instead. If you notice this happening, the keyword list is in
-  `src/analytics.py` (`_STAT_KEYWORDS`).
-- **Not yet containerized** — see the project owner if you need a Dockerfile
-  for deployment.
-- **Not a medical device** — outputs are for informational purposes only.
+## Contributing
+
+Contributions are welcome! Please feel free to open issues or submit pull requests.
+
+## License
+
+This project is open-source and available under the MIT License.
+
+## Contact
+
+For any questions or feedback, please contact [Your Name/Email/GitHub Profile].
 
 ---
-
-## 7. Troubleshooting
-
-| Problem | Likely cause / fix |
-|---|---|
-| `401 Unauthorized` downloading the model | You haven't run `huggingface-cli login`, or haven't been granted access to the gated Mistral model yet. |
-| App is extremely slow to answer | You're running on CPU. Either use a GPU machine or switch to an API-based LLM. |
-| `CUDA out of memory` | Lower `LLM_MAX_NEW_TOKENS` in `src/config.py`, or make sure 4-bit quantization (`USE_4BIT_QUANTIZATION = True`) is enabled. |
-| Answers don't reflect new files added to `data/` | Click "♻️ Rebuild Knowledge Base" in the sidebar, or delete the `faiss_index/` folder and restart. |
-| CSV-related questions go to the wrong pipeline | Add the phrasing you used to `_STAT_KEYWORDS` in `src/analytics.py`. |
-
----
-
-## Notes
-
-This project currently runs Mistral-7B **locally**, which requires a capable
-GPU. If most users running this app won't have one, an easy upgrade is to
-swap `src/llm.py` for a call to a hosted LLM API instead — this removes the
-GPU requirement entirely and runs identically on any machine. Ask if you'd
-like this change made.

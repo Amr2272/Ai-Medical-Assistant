@@ -43,8 +43,6 @@ class LLMManager:
                 "file in the project root:\n\n    GROQ_API_KEY=your_key_here\n"
             )
 
-        print(f"📥 Connecting to Groq API — model: {LLM_MODEL}")
-
         llm = ChatGroq(
             api_key=GROQ_API_KEY,
             model=LLM_MODEL,
@@ -52,13 +50,11 @@ class LLMManager:
             max_tokens=LLM_MAX_TOKENS,
         )
 
-        print("✅ LLM ready!")
         return llm
 
     def clear(self):
         """Drop the cached client (e.g. to pick up a new model/config)."""
         self._llm = None
-        print("🧹 LLM cleared from memory")
 
 
 # Singleton accessor function
