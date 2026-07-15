@@ -161,8 +161,5 @@ Contributions are welcome! Please feel free to open issues or submit pull reques
 
 This project is open-source and available under the MIT License.
 
-## Contact
-
-For any questions or feedback, please contact [Your Name/Email/GitHub Profile].
 
 ---
