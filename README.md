@@ -430,8 +430,8 @@ All chats are serialized to `data/chat_history.json` (with `datetime` ISO encodi
 | Want to rebuild the index | Click **♻️ Rebuild Knowledge Base** in the sidebar, or delete the `faiss_index/` folder |
 >>>>>>> bd1c4fb27d994cc1782005ee6802e51e51158d0c
 
-## Contact
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 For any questions or feedback, please contact [Your Name/Email/GitHub Profile].
 
@@ -467,3 +467,6 @@ Contributions, issues, and feature requests are welcome!
 3. Commit your changes (`git commit -m 'Add some feature'`)
 4. Push to the branch (`git push origin feature/your-feature`)
 5. Open a Pull Request
+=======
+---
+>>>>>>> 80fd8ee15fb822741b30fd7c57d8a0c2d1686750
